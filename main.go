@@ -2,24 +2,15 @@ package main
 
 import (
 	"bufio"
+	"encoding/hex"
 	"fmt"
 	"net"
-	"net/url"
 	"os"
-
-	"github.com/reiver/go-telnet"
+	"strings"
 )
 
+/****
 func main() {
-
-	s := "FL022020204150504C45545620202020"
-	s1, e := decode_fl(s)
-	if e == nil {
-		println(s1)
-	}
-	os.Exit(0)
-
-	main1()
 
 	var caller telnet.Caller = telnet.StandardCaller
 
@@ -28,8 +19,9 @@ func main() {
 		panic(err)
 	}
 }
+****/
 
-func main1() {
+func main() {
 	// connect to this socket
 	address := "192.168.86.32:23"
 	conn, _ := net.Dial("tcp", address)
@@ -38,6 +30,10 @@ func main1() {
 	defer conn.Close()
 
 	go read(conn)
+
+	ch := make(chan string)
+
+	go sender(conn, ch)
 
 	for {
 		// read from stdin:
@@ -51,10 +47,24 @@ func main1() {
 				fmt.Println("Goodbye!")
 				os.Exit(0)
 			}
-			text = trimmed + "\r\n"
-
-			fmt.Fprintf(conn, text+"\n")
+			comm := commandMap[trimmed]
+			if comm != "" {
+				fmt.Printf("Mapped to %s\n", comm)
+				text = comm + "\r\n"
+				// fmt.Fprintf(conn, text+"\n")
+			} else {
+				fmt.Printf("Unknown command %s, seding raw\n", trimmed)
+				text = trimmed
+			}
+			ch <- text
 		}
+	}
+}
+
+func sender(conn net.Conn, c chan string) {
+	for {
+		s := <-c
+		fmt.Fprintf(conn, s+"\n")
 	}
 }
 
@@ -62,31 +72,26 @@ func main1() {
 func read(conn net.Conn) {
 	for {
 		message, _ := bufio.NewReader(conn).ReadString('\n')
-		if len(message) > 1 {
-			fmt.Print("Message from server: " + message)
+		if len(message) == 0 {
+			continue
+		}
+		f, e := decode_fl(message)
+		if e == nil {
+			fmt.Println(f)
 		} else {
-			fmt.Print("got empty message")
+			fmt.Printf("Could not decode %s\n", message)
+			fmt.Printf("Message from server, len %d: %s ", len(message), message)
 		}
 	}
 }
 
 func decode_fl(s string) (string, error) {
-	if len(s) <= 2 {
-		return "", fmt.Errorf("fl string too short: %s", s)
-	}
-	if s[0:2] != "FL" {
+	fmt.Printf("Decoding %s\n", s)
+	if !(strings.HasPrefix(s, "FL")) {
 		return "", fmt.Errorf("string does not start with FL: %s", s)
 	}
 	s = s[2:]
 	s = s[2:]
-	i := 0
-	urls := ""
-	for i < len(s) {
-		urls += "%"
-		urls += s[i : i+2]
-		i += 2
-	}
-	r, e := url.Parse(urls)
-	fmt.Printf("%v\n", r.Path)
-	return r.Path, e
+	b, e := hex.DecodeString(s)
+	return string(b), e
 }
