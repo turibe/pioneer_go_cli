@@ -31,7 +31,7 @@ func main() {
 	defer conn.Close()
 	go read(conn)
 
-	ch := make(chan string)
+	ch := make(chan string, 100)
 	go sender(conn, ch)
 
 	for {
@@ -69,10 +69,12 @@ func main() {
 func sender(conn net.Conn, c chan string) {
 	for {
 		s := <-c
+		// fmt.Printf("Got message %s\n", s)
 		fmt.Fprintf(conn, s+"\r\n")
 	}
 }
 
+// @TODO check they all get processed?
 func get_status(c chan string) {
 	vals := []string{
 		"?P",
@@ -93,8 +95,13 @@ func get_status(c chan string) {
 
 // listen for reply
 func read(conn net.Conn) {
+	reader := bufio.NewReader(conn)
 	for {
-		message, _ := bufio.NewReader(conn).ReadString('\n')
+		message, e := reader.ReadString('\n')
+		if e != nil {
+			fmt.Println("Read error", e)
+		}
+		// fmt.Println("Read from conn: ", message)
 		message = strings.TrimSpace(message)
 		if len(message) == 0 {
 			continue
@@ -118,7 +125,11 @@ func decode_message(message string) (string, error) {
 	if strings.HasPrefix(message, "RGB") {
 		return "TODO: learn from: " + message, nil
 	}
-	f, e := decode_geh(message)
+	f, e := decode_tone(message)
+	if e == nil {
+		return f, e
+	}
+	f, e = decode_geh(message)
 	if e == nil {
 		return f, e
 	}
@@ -154,6 +165,18 @@ func decode_message(message string) (string, error) {
 	if strings.HasPrefix(message, "VTC") {
 		return decode_vtc(message)
 	}
-
+	f, e = translate_mode(message)
+	if e == nil {
+		return f, e
+	}
+	if strings.HasPrefix(message, "AST") {
+		// TODO: clean up
+		decode_ast(message)
+		return "", nil
+	}
+	f, e = decode_vst(message)
+	if e == nil {
+		return f, e
+	}
 	return message, nil
 }

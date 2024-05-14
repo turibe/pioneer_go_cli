@@ -139,33 +139,34 @@ func decode_ast(st string) bool {
 
 	// assert s.startswith("AST")
 	s := []byte(st[3:])
-	print("Audio input signal: " + decode_ais(s[0:2]))
-	print("Audio input frequency: " + decode_aif(s[2:4]))
+	println("Audio input signal: " + decode_ais(s[0:2]))
+	println("Audio input frequency: " + decode_aif(s[2:4]))
 	// The manual starts counting at 1, so to fix this off-by-one, we do:
 	s = append([]byte("-"), s...)
+
 	// channels...
-	print("Input Channels:")
+	println("Input Channels:")
 
 	for i, v := range CHANNEL_MAP {
 		if i >= len(s) {
 			continue
 		}
 		if s[i] == '1' {
-			fmt.Printf("%s, ", v)
+			fmt.Printf("%s,\n", v)
 		}
 	}
-	print("")
-	print("Output Channels:")
+	println("")
+	println("Output Channels:")
 	for i, v := range CHANNEL_MAP {
 		idx := i + 21
 		if idx >= len(s) {
 			continue
 		}
 		if s[idx] == '1' {
-			fmt.Printf("%s, ", v)
+			fmt.Printf("%s,\n", v)
 		}
 	}
-	print("")
+	// println("")
 	return true
 }
 
@@ -231,129 +232,137 @@ func decode_ais(st []byte) string {
 }
 
 // db level conversion
-func db_level(s string) (string, error) {
+func db_level(s string) string {
 	n, e := strconv.Atoi(s)
+	if e != nil {
+		return "?"
+	}
 	db := 6 - n
-	return fmt.Sprintf("{%d}dB", db), e
+	return fmt.Sprintf("{%d}dB", db)
 }
 
-/****
+// readable version of the tone status
+func decode_tone(s string) (string, error) {
+	if strings.HasPrefix(s, "TR") {
+		return "treble at " + db_level(s[2:4]), nil
+	}
+	if strings.HasPrefix(s, "BA") {
+		return "bass at " + db_level(s[2:4]), nil
+	}
+	if s == "TO0" {
+		return "tone off", nil
+	}
+	if s == "TO1" {
+		return "tone on", nil
+	}
+	return "", fmt.Errorf("unknown tone %s", s)
+}
 
-def decode_tone(s: str) -> Optional[str]:
-    "readable version of the tone status"
-    if s.startswith("TR"):
-        return "treble at " + db_level(s[2:4])
-    if s.startswith("BA"):
-        return "bass at " + db_level(s[2:4])
-    if s == "TO0":
-        return "tone off"
-    if s == "TO1":
-        return "tone on"
-    return None
+var SIGNAL_MAP = MyMap[byte, string]{
+	'0': "---",
+	'1': "VIDEO",
+	'2': "S-VIDEO",
+	'3': "COMPONENT",
+	'4': "HDMI",
+	'5': "Self OSD/JPEG",
+}
 
-SIGNAL_MAP = {
-    "0": "---",
-    "1": "VIDEO",
-    "2": "S-VIDEO",
-    "3": "COMPONENT",
-    "4": "HDMI",
-    "5": "Self OSD/JPEG"
-    }
+var SIGNAL_FORMAT_MAP = MyMap[string, string]{
+	"00": "---",
+	"01": "480/60i",
+	"02": "576/50i",
+	"03": "480/60p",
+	"04": "576/50p",
+	"05": "720/60p",
+	"06": "720/50p",
+	"07": "1080/60i",
+	"08": "1080/50i",
+	"09": "1080/60p",
+	"10": "1080/50p",
+	"11": "1080/24p",
+	"12": "4Kx2K/24Hz",
+	"13": "4Kx2K/25Hz",
+	"14": "4Kx2K/30Hz",
+	"15": "4Kx2K/24Hz(SMPTE)",
+}
 
-SIGNAL_FORMAT_MAP = {
-    "00": "---",
-    "01": "480/60i",
-    "02": "576/50i",
-    "03": "480/60p",
-    "04": "576/50p",
-    "05": "720/60p",
-    "06": "720/50p",
-    "07": "1080/60i",
-    "08": "1080/50i",
-    "09": "1080/60p",
-    "10": "1080/50p",
-    "11": "1080/24p",
-    "12": "4Kx2K/24Hz",
-    "13": "4Kx2K/25Hz",
-    "14": "4Kx2K/30Hz",
-    "15": "4Kx2K/24Hz(SMPTE)"
-    }
+var ASPECT_MAP = MyMap[byte, string]{
+	'0': "---",
+	'1': "4:3",
+	'2': "16:9",
+	'3': "14:9",
+}
 
-ASPECT_MAP = {
-    "0": "---",
-    "1": "4:3",
-    "2": "16:9",
-    "3": "14:9"
-    }
+// HDMI ONLY
+var COLOR_MAP = MyMap[byte, string]{
+	'0': "---",
+	'1': "RGB Limit",
+	'2': "RGB Full",
+	'3': "YcbCr444",
+	'4': "YcbCr422",
+}
 
-# HDMI ONLY
-COLOR_MAP = {
-    "0": "---",
-    "1": "RGB Limit",
-    "2": "RGB Full",
-    "3": "YcbCr444",
-    "4": "YcbCr422"
-    }
+// HDMI ONLY
+var FORMAT_BIT_MAP = MyMap[byte, string]{
+	'0': "---",
+	'1': "24bit (8bit*3)",
+	'2': "30bit (10bit*3)",
+	'3': "36bit (12bit*3)",
+	'4': "48bit (16bit*3)",
+}
 
-# HDMI ONLY
-FORMAT_BIT_MAP = {
-    "0": "---",
-    "1": "24bit (8bit*3)",
-    "2": "30bit (10bit*3)",
-    "3": "36bit (12bit*3)",
-    "4": "48bit (16bit*3)"
-    }
+var COLOR_SPACE_MAP = MyMap[byte, string]{
+	'0': "---",
+	'1': "Standard",
+	'2': "xvYCC601",
+	'3': "xvYCC709",
+	'4': "sYCC",
+	'5': "AdobeYCC601",
+	'6': "AdobeRGB",
+}
 
-COLOR_SPACE_MAP = {
-    "0": "---",
-    "1": "Standard",
-    "2": "xvYCC601",
-    "3": "xvYCC709",
-    "4": "sYCC",
-    "5": "AdobeYCC601",
-    "6": "AdobeRGB"
-    }
+func decode_vst(st string) (string, error) {
+	if !(strings.HasPrefix(st, "VST")) {
+		return "", fmt.Errorf("bad VST: %s", st)
+	}
+	result := ""
+	s := "-" + st[3:] // for off-by-one
+	// fmt.Printf("Decoding %s\n", s)
+	signal := SIGNAL_MAP.get(s[1], "Unknown")
+	result += fmt.Sprint("Signal: ", signal, "\n")
+	sformat := SIGNAL_FORMAT_MAP.get(s[2:4], "Unknown")
+	result += fmt.Sprint("Input resolution: ", sformat, "\n")
+	aspect := ASPECT_MAP.get(s[4], "Unknown")
+	result += fmt.Sprint("Aspect: ", aspect, "\n")
+	color := COLOR_MAP.get(s[5], "Unknown")
+	result += fmt.Sprint("Input color format: ", color, "\n")
 
-def decode_vst(s: str) -> Optional[str]:
-    if not s.startswith('VST'):
-        return None
-    print(f"Decoding {s}\n")
-    result = ""
-    s = "-" + s[3:] # for off-by-one
-    signal = SIGNAL_MAP.get(s[1], "Unknown")
-    result += f"Signal: {signal}\n"
-    sformat = SIGNAL_FORMAT_MAP.get(s[2:4], "Unknown")
-    result += f"Input resolution: {sformat}\n"
-    aspect = ASPECT_MAP.get(s[4], "Unknown")
-    result += f"Aspect: {aspect}\n"
-    color = COLOR_MAP.get(s[5], "Unknown")
-    result += f"Input color format: {color}\n"
-    ibit = FORMAT_BIT_MAP.get(s[6], "Unknown")
-    result += f"Input bit (HDMI only): {ibit}\n"
-    cspace = COLOR_SPACE_MAP.get(s[7], "Unknown")
-    result += f"Input extend color space (HDMI only): {cspace}\n"
-    oformat = SIGNAL_FORMAT_MAP.get(s[8:10], "Unknown")
-    result += f"Output resolution: {oformat}\n"
-    oaspect = ASPECT_MAP.get(s[10], "Unknown")
-    result += f"Output aspect: {oaspect}\n"
-    ocolor = COLOR_MAP.get(s[11], "Unknown")
-    result += f"Output color format (HDMI only): {ocolor}\n"
-    obit = FORMAT_BIT_MAP.get(s[12], "Unknown")
-    result += f"Output bit (HDMI only): {obit}\n"
-    ospace = COLOR_SPACE_MAP.get(s[13], "Unknown")
-    result += f"Output extend color space (HDMI only): {ospace}\n"
-    mrecommend = SIGNAL_FORMAT_MAP.get(s[14:16], "Unknown")
-    result += f"Monitor recommend resolution information: {mrecommend}\n"
-    mdcolor = FORMAT_BIT_MAP.get(s[16], "Unknown")
-    result += f"Monitor DeepColor: {mdcolor}\n"
-    # ... TODO
-    return result
+	ibit := FORMAT_BIT_MAP.get(s[6], "Unknown")
+	result += fmt.Sprint("Input bit (HDMI only): ", ibit, "\n")
+	cspace := COLOR_SPACE_MAP.get(s[7], "Unknown")
+	result += fmt.Sprint("Input extend color space (HDMI only): ", cspace, "\n")
+	oformat := SIGNAL_FORMAT_MAP.get(s[8:10], "Unknown")
+	result += fmt.Sprint("Output resolution: ", oformat, "\n")
+	oaspect := ASPECT_MAP.get(s[10], "Unknown")
+	result += fmt.Sprint("Output aspect: ", oaspect, "\n")
+	ocolor := COLOR_MAP.get(s[11], "Unknown")
+	result += fmt.Sprint("Output color format (HDMI only): ", ocolor, "\n")
+	obit := FORMAT_BIT_MAP.get(s[12], "Unknown")
+	result += fmt.Sprint("Output bit (HDMI only): ", obit, "\n")
+	ospace := COLOR_SPACE_MAP.get(s[13], "Unknown")
+	result += fmt.Sprint("Output extend color space (HDMI only): ", ospace, "\n")
+	mrecommend := SIGNAL_FORMAT_MAP.get(s[14:16], "Unknown")
+	result += fmt.Sprint("Monitor recommend resolution information: ", mrecommend, "\n")
+	mdcolor := FORMAT_BIT_MAP.get(s[16], "Unknown")
+	result += fmt.Sprint("Monitor DeepColor: ", mdcolor, "\n")
 
+	// ... TODO
+	return result, nil
+}
 
-def decode_vta(s: str) -> Optional[str]:
-    if not s.startswith('VTA'):
-        return None
-    return None
-
-
-***/
+func decode_vta(s string) string {
+	if !strings.HasPrefix(s, "VTA") {
+		return ""
+	}
+	return ""
+}
