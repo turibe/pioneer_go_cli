@@ -2,12 +2,13 @@ package main
 
 import (
 	"bufio"
-	"encoding/hex"
 	"fmt"
 	"net"
 	"os"
 	"strings"
 )
+
+var DEBUG = false
 
 /****
 func main() {
@@ -28,32 +29,36 @@ func main() {
 	fmt.Printf("Connected to %s\n", address)
 
 	defer conn.Close()
-
 	go read(conn)
 
 	ch := make(chan string)
-
 	go sender(conn, ch)
 
 	for {
 		// read from stdin:
 		reader := bufio.NewReader(os.Stdin)
-		fmt.Print("Text to send: ")
+		fmt.Print(">> ")
 		text, _ := reader.ReadString('\n')
 		if len(text) > 1 {
 			// send to socket
 			trimmed := text[0 : len(text)-1]
-			if trimmed == "quit" {
+			if trimmed == "quit" || trimmed == "exit" {
 				fmt.Println("Goodbye!")
 				os.Exit(0)
 			}
+			if trimmed == "status" {
+				get_status(ch)
+				continue
+			}
 			comm := commandMap[trimmed]
 			if comm != "" {
-				fmt.Printf("Mapped to %s\n", comm)
-				text = comm + "\r\n"
+				if DEBUG {
+					fmt.Printf("Mapped to %s\n", comm)
+				}
+				text = comm
 				// fmt.Fprintf(conn, text+"\n")
 			} else {
-				fmt.Printf("Unknown command %s, seding raw\n", trimmed)
+				fmt.Printf("Unknown command, sending raw: %s\n", trimmed)
 				text = trimmed
 			}
 			ch <- text
@@ -64,7 +69,25 @@ func main() {
 func sender(conn net.Conn, c chan string) {
 	for {
 		s := <-c
-		fmt.Fprintf(conn, s+"\n")
+		fmt.Fprintf(conn, s+"\r\n")
+	}
+}
+
+func get_status(c chan string) {
+	vals := []string{
+		"?P",
+		"?F",
+		"?BA",
+		"?TR",
+		"?TO",
+		"?L",
+		"?AST",
+		"?IS",
+		"?VST",
+	}
+
+	for _, v := range vals {
+		c <- v
 	}
 }
 
@@ -72,10 +95,11 @@ func sender(conn net.Conn, c chan string) {
 func read(conn net.Conn) {
 	for {
 		message, _ := bufio.NewReader(conn).ReadString('\n')
+		message = strings.TrimSpace(message)
 		if len(message) == 0 {
 			continue
 		}
-		f, e := decode_fl(message)
+		f, e := decode_message(message)
 		if e == nil {
 			fmt.Println(f)
 		} else {
@@ -85,13 +109,51 @@ func read(conn net.Conn) {
 	}
 }
 
-func decode_fl(s string) (string, error) {
-	fmt.Printf("Decoding %s\n", s)
-	if !(strings.HasPrefix(s, "FL")) {
-		return "", fmt.Errorf("string does not start with FL: %s", s)
+func decode_message(message string) (string, error) {
+
+	em := ErrorMap[message]
+	if em != "" {
+		return em, nil
 	}
-	s = s[2:]
-	s = s[2:]
-	b, e := hex.DecodeString(s)
-	return string(b), e
+	if strings.HasPrefix(message, "RGB") {
+		return "TODO: learn from: " + message, nil
+	}
+	f, e := decode_geh(message)
+	if e == nil {
+		return f, e
+	}
+	f, e = decode_fl(message)
+	if e == nil {
+		return f, e
+	}
+	if strings.HasPrefix(message, "IS") {
+		switch message[2] {
+		case '0':
+			return "Phase control OFF", nil
+		case '1':
+			return "Phase control ON", nil
+		case '2':
+			return "Full band phase control on", nil
+		default:
+			return ("Phase control: unknown"), nil
+		}
+	}
+
+	switch message {
+	case "PWR0":
+		return "Power is ON", nil
+	case "PWR1":
+		return "Power is OFF", nil
+	}
+
+	if strings.HasPrefix(message, "FN") {
+		// println("Got input %s", message)
+		inputstring := defaultInputSourcesMap[message[2:]]
+		return inputstring, nil
+	}
+	if strings.HasPrefix(message, "VTC") {
+		return decode_vtc(message)
+	}
+
+	return message, nil
 }
