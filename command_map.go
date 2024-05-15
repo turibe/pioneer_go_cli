@@ -68,5 +68,6 @@ var commandMap = map[string]string{
 	// cycles through thx modes, but input must be THX:
 	"thx": "0050SR",
 	// cycles through surround modes (shortcut for "mode" command):
-	"surr": "0100SR",
+	"surr":         "0100SR",
+	"video status": "?VST",
 }

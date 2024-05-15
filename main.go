@@ -3,8 +3,10 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -38,19 +40,43 @@ func main() {
 		// read from stdin:
 		reader := bufio.NewReader(os.Stdin)
 		fmt.Print(">> ")
-		text, _ := reader.ReadString('\n')
+		text, e := reader.ReadString('\n')
+		if e == io.EOF {
+			exit()
+		}
 		if len(text) > 1 {
 			// send to socket
-			trimmed := text[0 : len(text)-1]
-			if trimmed == "quit" || trimmed == "exit" {
-				fmt.Println("Goodbye!")
-				os.Exit(0)
+			command := strings.ToLower(strings.TrimSpace(text))
+			if command == "quit" || command == "exit" {
+				exit()
 			}
-			if trimmed == "status" {
+			if command == "status" {
 				get_status(ch)
 				continue
 			}
-			comm := commandMap[trimmed]
+			if command == "video status" {
+				ch <- "?VST"
+				continue
+			}
+			i, err := strconv.Atoi(command)
+			if err == nil {
+				if i > 0 {
+					fmt.Printf("Volume up %d\n", i)
+					i = min(i, 10)
+					for x := 0; x < i; x++ {
+						ch <- "VU"
+					}
+				}
+				if i < 0 {
+					i = Abs(max(i, -30))
+					fmt.Printf("Volume down %d\n", i)
+					for x := 0; x < i; x++ {
+						ch <- "VD"
+					}
+				}
+				continue
+			}
+			comm := commandMap[command]
 			if comm != "" {
 				if DEBUG {
 					fmt.Printf("Mapped to %s\n", comm)
@@ -58,12 +84,17 @@ func main() {
 				text = comm
 				// fmt.Fprintf(conn, text+"\n")
 			} else {
-				fmt.Printf("Unknown command, sending raw: %s\n", trimmed)
-				text = trimmed
+				fmt.Printf("Unknown command, sending raw: %s\n", command)
+				text = command
 			}
 			ch <- text
 		}
 	}
+}
+
+func exit() {
+	fmt.Println("Adios!")
+	os.Exit(0)
 }
 
 func sender(conn net.Conn, c chan string) {
@@ -74,7 +105,7 @@ func sender(conn net.Conn, c chan string) {
 	}
 }
 
-// @TODO check they all get processed?
+// sends query commands to get various system status info back
 func get_status(c chan string) {
 	vals := []string{
 		"?P",
@@ -108,7 +139,9 @@ func read(conn net.Conn) {
 		}
 		f, e := decode_message(message)
 		if e == nil {
-			fmt.Println(f)
+			if len(f) > 0 {
+				fmt.Println(f)
+			}
 		} else {
 			fmt.Printf("Could not decode %s\n", message)
 			fmt.Printf("Message from server, len %d: %s ", len(message), message)
@@ -116,6 +149,7 @@ func read(conn net.Conn) {
 	}
 }
 
+// handles the message that comes back from the AVR
 func decode_message(message string) (string, error) {
 
 	em := ErrorMap[message]
@@ -178,5 +212,17 @@ func decode_message(message string) (string, error) {
 	if e == nil {
 		return f, e
 	}
+	if strings.HasPrefix(message, "VOL") {
+		return "", nil
+	}
 	return message, nil
+}
+
+// ======= helpers
+
+func Abs[T ~int | ~int32 | ~int64](x T) T {
+	if x < 0 {
+		return -x
+	}
+	return x
 }
