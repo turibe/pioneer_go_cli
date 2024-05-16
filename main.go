@@ -37,7 +37,12 @@ func main() {
 			exit()
 		}
 		command := strings.ToLower(strings.TrimSpace(text))
+		if command == "" {
+			continue
+		}
+		// note: if string is empty, split_command returns [empty]
 		split_command := strings.Split(command, " ")
+		fmt.Printf("%s %d\n", split_command, len(split_command))
 		if len(split_command) == 0 {
 			continue
 		}
@@ -48,38 +53,27 @@ func main() {
 				second_arg = split_command[1]
 			}
 		*/
-
-		// TODO: use a switch
-
-		if command == "quit" || command == "exit" {
+		i, err := strconv.Atoi(command)
+		comm := commandMap[command]
+		switch {
+		case command == "quit" || command == "exit":
 			exit()
-		}
-		if command == "debug" {
+		case command == "debug":
 			DEBUG = !DEBUG
 			fmt.Printf("Debug is now %v", DEBUG)
-		}
-		if command == "status" {
+		case command == "status":
 			get_status(ch)
-			continue
-		}
-		if command == "learn" {
+		case command == "learn":
 			for i := 0; i < 60; i++ {
 				s := fmt.Sprintf("?RGB%2d", i)
 				ch <- s
 			}
-			continue
-		}
-		if command == "sources" || command == "inputs" {
+		case command == "sources" || command == "inputs":
 			print_input_source_help()
-			continue
-		}
-		if command == "help" {
+		case command == "help":
 			print_help()
-			continue
-		}
 		// skipping "select" and "display" for now
-		i, err := strconv.Atoi(command)
-		if err == nil {
+		case err == nil:
 			if i > 0 {
 				fmt.Printf("Volume up %d\n", i)
 				i = min(i, 10)
@@ -94,26 +88,20 @@ func main() {
 					ch <- "VD"
 				}
 			}
-			continue
-		}
-		comm := commandMap[command]
-		if comm != "" {
+
+		case comm != "":
 			if DEBUG {
 				fmt.Printf("Mapped to %s\n", comm)
 			}
 			text = comm
 			ch <- text
-			continue
-		}
-		if base_command == "mode" {
+		case base_command == "mode":
 			change_mode(ch, split_command)
-			continue
+		default:
+			fmt.Printf("Unknown command, sending raw: %s\n", command)
+			text = command
+			ch <- text
 		}
-
-		fmt.Printf("Unknown command, sending raw: %s\n", command)
-		text = command
-		ch <- text
-
 	}
 }
 
