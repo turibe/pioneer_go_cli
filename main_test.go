@@ -19,3 +19,12 @@ func TestDecodeFL2(t *testing.T) {
 	assert.Equal(t, "M.VOL  -18.5dB", s1)
 	assert.Equal(t, e, nil)
 }
+
+func TestDecodeMessage(t *testing.T) {
+	f, e := decode_message("LM010f")
+	assert.Equal(t, nil, e)
+	assert.Equal(t, "WIDE SURR MUSIC", f)
+
+	f, e = decode_message("foobar")
+	assert.NotNil(t, e)
+}

@@ -79,7 +79,7 @@ func (m *SourceMap) init_from_map(initmap map[string]string) {
 func (m *SourceMap) read_from_file() {
 	data, err := os.ReadFile(sources_map_filename)
 	if err != nil {
-		fmt.Printf("Couldnt read json file %s\n", sources_map_filename)
+		fmt.Printf("Could not read json file %s\n", sources_map_filename)
 		return
 	}
 	// var mystruct []interface{}
@@ -90,6 +90,7 @@ func (m *SourceMap) read_from_file() {
 		return
 	}
 	m.init_from_map(mystruct)
+	fmt.Printf("Updated sources map from %s\n", sources_map_filename)
 }
 
 func (m *SourceMap) save_to_file() {

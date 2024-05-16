@@ -360,9 +360,9 @@ func decode_vst(st string) (string, error) {
 	return result, nil
 }
 
-func decode_vta(s string) string {
-	if !strings.HasPrefix(s, "VTA") {
-		return ""
+func decode_vta(s string) (string, error) {
+	if strings.HasPrefix(s, "VTA") {
+		return "TODO: decode VTA", nil
 	}
-	return ""
+	return "", fmt.Errorf("bad VTA: %s", s)
 }

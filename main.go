@@ -15,7 +15,7 @@ var DEBUG = false
 func main() {
 	// args := flag.Args() // doesn't work
 	args := os.Args
-	if len(args) > 0 {
+	if false && len(args) > 0 {
 		fmt.Printf("Found args %v\n", args)
 	}
 	address := "192.168.86.32:23"
@@ -77,6 +77,8 @@ func main() {
 			SOURCE_MAP.save_to_file()
 		case command == "sources" || command == "inputs":
 			print_input_source_help()
+		case command == "modes":
+			print_mode_help()
 		case command == "help":
 			print_help()
 		// skipping "select" and "display" for now
@@ -119,15 +121,15 @@ func change_mode(ch chan string, split_command []string) bool {
 	modestring := strings.Join(split_command[1:], " ")
 	if modestring == "help" {
 		print_mode_help()
-		return false
+		return true
 	}
 	mset := get_modes_with_prefix(modestring)
 	if len(mset) == 1 {
 		mode := mset[0]
 		m := inverseModeSetMap[mode]
-		fmt.Printf("trying to change mode to %s (%s)", modestring, m)
+		fmt.Printf("Trying to change mode to %s (%s)\n", modestring, m)
 		ch <- m + "SR"
-		return false
+		return true
 	}
 	fmt.Println("Which mode do you mean? Options are:")
 	for i := 0; i < len(mset); i++ {
@@ -209,13 +211,13 @@ func read(conn net.Conn) {
 			continue
 		}
 		f, e := decode_message(message)
-		if e == nil {
-			if len(f) > 0 {
-				fmt.Println(f)
-			}
+		if e == nil && len(f) > 0 {
+			fmt.Println(f)
 		} else {
-			fmt.Printf("Could not decode %s\n", message)
-			fmt.Printf("Message from server, len %d: %s ", len(message), message)
+			if e != nil {
+				fmt.Printf("Could not decode %v\n", e)
+				fmt.Printf("Message from server, len %d: %s ", len(message), message)
+			}
 		}
 	}
 }
@@ -223,12 +225,15 @@ func read(conn net.Conn) {
 // handles the message that comes back from the AVR
 func decode_message(message string) (string, error) {
 
+	// TODO: this function often checks things twice, builds unecessary errors.
+	// Ideally would simplify to a switch.
 	em := ErrorMap[message]
 	if em != "" {
 		return em, nil
 	}
 	if strings.HasPrefix(message, "RGB") {
 		SOURCE_MAP.learn_input_from(message[3:])
+		return "", nil
 	}
 	f, e := decode_tone(message)
 	if e == nil {
@@ -239,6 +244,10 @@ func decode_message(message string) (string, error) {
 		return f, e
 	}
 	f, e = decode_fl(message)
+	if e == nil {
+		return f, e
+	}
+	f, e = decode_vta(message)
 	if e == nil {
 		return f, e
 	}
@@ -286,7 +295,7 @@ func decode_message(message string) (string, error) {
 	if strings.HasPrefix(message, "VOL") {
 		return "", nil
 	}
-	return message, nil
+	return message, fmt.Errorf("unknown message %s", message)
 }
 
 func print_help() {
