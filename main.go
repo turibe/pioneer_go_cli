@@ -12,20 +12,12 @@ import (
 
 var DEBUG = false
 
-/****
 func main() {
-
-	var caller telnet.Caller = telnet.StandardCaller
-
-	err := telnet.DialToAndCall("192.168.86.32:23", caller)
-	if nil != err {
-		panic(err)
+	// args := flag.Args() // doesn't work
+	args := os.Args
+	if len(args) > 0 {
+		fmt.Printf("Found args %v\n", args)
 	}
-}
-****/
-
-func main() {
-	// connect to this socket
 	address := "192.168.86.32:23"
 	conn, _ := net.Dial("tcp", address)
 	fmt.Printf("Connected to %s\n", address)
@@ -44,52 +36,131 @@ func main() {
 		if e == io.EOF {
 			exit()
 		}
-		if len(text) > 1 {
-			// send to socket
-			command := strings.ToLower(strings.TrimSpace(text))
-			if command == "quit" || command == "exit" {
-				exit()
+		command := strings.ToLower(strings.TrimSpace(text))
+		split_command := strings.Split(command, " ")
+		if len(split_command) == 0 {
+			continue
+		}
+		base_command := split_command[0]
+		/*
+			second_arg := ""
+			if len(split_command) > 1 {
+				second_arg = split_command[1]
 			}
-			if command == "status" {
-				get_status(ch)
-				continue
+		*/
+
+		// TODO: use a switch
+
+		if command == "quit" || command == "exit" {
+			exit()
+		}
+		if command == "debug" {
+			DEBUG = !DEBUG
+			fmt.Printf("Debug is now %v", DEBUG)
+		}
+		if command == "status" {
+			get_status(ch)
+			continue
+		}
+		if command == "learn" {
+			for i := 0; i < 60; i++ {
+				s := fmt.Sprintf("?RGB%2d", i)
+				ch <- s
 			}
-			if command == "video status" {
-				ch <- "?VST"
-				continue
-			}
-			i, err := strconv.Atoi(command)
-			if err == nil {
-				if i > 0 {
-					fmt.Printf("Volume up %d\n", i)
-					i = min(i, 10)
-					for x := 0; x < i; x++ {
-						ch <- "VU"
-					}
+			continue
+		}
+		if command == "sources" || command == "inputs" {
+			print_input_source_help()
+			continue
+		}
+		if command == "help" {
+			print_help()
+			continue
+		}
+		// skipping "select" and "display" for now
+		i, err := strconv.Atoi(command)
+		if err == nil {
+			if i > 0 {
+				fmt.Printf("Volume up %d\n", i)
+				i = min(i, 10)
+				for x := 0; x < i; x++ {
+					ch <- "VU"
 				}
-				if i < 0 {
-					i = Abs(max(i, -30))
-					fmt.Printf("Volume down %d\n", i)
-					for x := 0; x < i; x++ {
-						ch <- "VD"
-					}
-				}
-				continue
 			}
-			comm := commandMap[command]
-			if comm != "" {
-				if DEBUG {
-					fmt.Printf("Mapped to %s\n", comm)
+			if i < 0 {
+				i = Abs(max(i, -30))
+				fmt.Printf("Volume down %d\n", i)
+				for x := 0; x < i; x++ {
+					ch <- "VD"
 				}
-				text = comm
-				// fmt.Fprintf(conn, text+"\n")
-			} else {
-				fmt.Printf("Unknown command, sending raw: %s\n", command)
-				text = command
 			}
+			continue
+		}
+		comm := commandMap[command]
+		if comm != "" {
+			if DEBUG {
+				fmt.Printf("Mapped to %s\n", comm)
+			}
+			text = comm
 			ch <- text
+			continue
+		}
+		if base_command == "mode" {
+			change_mode(ch, split_command)
+			continue
+		}
+
+		fmt.Printf("Unknown command, sending raw: %s\n", command)
+		text = command
+		ch <- text
+
+	}
+}
+
+func change_mode(ch chan string, split_command []string) bool {
+	if len(split_command) < 2 {
+		return false
+	}
+	modestring := strings.Join(split_command[1:], " ")
+	if modestring == "help" {
+		print_mode_help()
+		return false
+	}
+	mset := get_modes_with_prefix(modestring)
+	if len(mset) == 1 {
+		mode := mset[0]
+		m := inverseModeSetMap[mode]
+		fmt.Printf("trying to change mode to %s (%s)", modestring, m)
+		ch <- m + "SR"
+		return false
+	}
+	fmt.Println("Which mode do you mean? Options are:")
+	for i := 0; i < len(mset); i++ {
+		println(mset[i])
+	}
+	return false
+}
+
+// Lists the mode change options (not all work)
+func print_mode_help() {
+	fmt.Println("mode [mode]\tfor one of:")
+	for i := range inverseModeSetMap {
+		println(i)
+	}
+}
+
+func get_modes_with_prefix(prefix string) []string {
+	r := []string{}
+	for k := range inverseModeSetMap {
+		if strings.HasPrefix(k, prefix) {
+			r = append(r, k)
 		}
 	}
+	return r
+}
+
+func print_input_source_help() {
+	panic("unimplemented")
 }
 
 func exit() {
@@ -97,7 +168,7 @@ func exit() {
 	os.Exit(0)
 }
 
-func sender(conn net.Conn, c chan string) {
+func sender(conn net.Conn, c <-chan string) {
 	for {
 		s := <-c
 		// fmt.Printf("Got message %s\n", s)
@@ -106,7 +177,7 @@ func sender(conn net.Conn, c chan string) {
 }
 
 // sends query commands to get various system status info back
-func get_status(c chan string) {
+func get_status(c chan<- string) {
 	vals := []string{
 		"?P",
 		"?F",
@@ -218,7 +289,14 @@ func decode_message(message string) (string, error) {
 	return message, nil
 }
 
-// ======= helpers
+func print_help() {
+	for c := range commandMap {
+		println(c)
+	}
+	print("Use \"help mode\" for information on modes, \"help sources\" for changing input sources, \"quit\" to exit\n")
+}
+
+// ======= helper functions:
 
 func Abs[T ~int | ~int32 | ~int64](x T) T {
 	if x < 0 {
