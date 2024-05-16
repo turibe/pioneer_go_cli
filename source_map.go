@@ -1,5 +1,10 @@
 package main
 
+import (
+	"fmt"
+	"strings"
+)
+
 var defaultInputSourcesMap = map[string]string{
 	"00": "PHONO",
 	"01": "CD",
@@ -38,4 +43,82 @@ var ErrorMap = map[string]string{
 	"E04": "COMMAND ERROR",
 	"E06": "PARAMETER ERROR",
 	"B00": "BUSY",
+}
+
+var sources_map_filename = "pioneer_avr_sources.json"
+
+// TODO: replicate sources.py
+
+type SourceMap struct {
+	source_map  map[string]string
+	inverse_map map[string]string
+	alias_map   map[string]string
+}
+
+var SOURCE_MAP SourceMap
+
+func init() {
+	SOURCE_MAP = SourceMap{}
+	SOURCE_MAP.inverse_map = map[string]string{}
+	SOURCE_MAP.alias_map = map[string]string{}
+	SOURCE_MAP.init_from_map(defaultInputSourcesMap)
+	SOURCE_MAP.add_aliases()
+}
+
+func (m *SourceMap) init_from_map(initmap map[string]string) {
+	m.source_map = map[string]string{}
+	for k, v := range initmap {
+		m.source_map[k] = v
+		m.register_reverse_source(k, v)
+	}
+}
+
+func (m SourceMap) register_reverse_source(k string, v string) {
+	newk := strings.ToLower(v)
+	m.inverse_map[newk] = strings.Join([]string{k, "FN"}, "")
+}
+
+func (m *SourceMap) update_source(name string, id string) {
+	fmt.Printf("Updating source %s (%s)\n", name, id)
+	m.source_map[id] = name
+	m.register_reverse_source(id, name)
+	alias, ok := m.alias_map[name]
+	if ok {
+		m.check_aliases(name, alias)
+	}
+}
+
+func (m SourceMap) add_alias(a string, b string) {
+	a = strings.ToLower(a)
+	b = strings.ToLower(b)
+	m.alias_map[a] = b
+	m.alias_map[b] = a
+	m.check_aliases(a, b)
+}
+func (m SourceMap) check_aliases(a string, b string) {
+	_, has_a := m.inverse_map[a]
+	_, has_b := m.inverse_map[b]
+	if !has_a && has_b {
+		m.inverse_map[a] = m.inverse_map[b]
+	} else {
+		if !has_b && has_a {
+			m.inverse_map[b] = m.inverse_map[a]
+		}
+	}
+}
+
+func (m SourceMap) add_aliases() {
+	m.add_alias("apple", "appletv")
+	m.add_alias("amazon", "amazontv")
+	m.add_alias("radio", "tuner")
+	m.add_alias("iradio", "internet radio")
+}
+
+func (m *SourceMap) learn_input_from(s string) {
+	id := s[0:2]
+	name := s[3:]
+	if m.source_map[id] != name {
+		fmt.Printf("Updating source name %s for %s\n", name, id)
+		m.update_source(name, id)
+	}
 }

@@ -54,7 +54,10 @@ func main() {
 			}
 		*/
 		i, err := strconv.Atoi(command)
-		comm := commandMap[command]
+		comm, ok := commandMap[command]
+		if !ok {
+			comm = SOURCE_MAP.inverse_map[command]
+		}
 		switch {
 		case command == "quit" || command == "exit":
 			exit()
@@ -148,7 +151,12 @@ func get_modes_with_prefix(prefix string) []string {
 }
 
 func print_input_source_help() {
-	panic("unimplemented")
+	fmt.Println("Enter one of the following to change input:")
+	for i, inv := range SOURCE_MAP.inverse_map { // TODO: sort
+		fmt.Printf("%s (%s)\n", i, inv)
+	}
+	fmt.Println("Use 'learn' to update this map, 'save' to save it.")
+
 }
 
 func exit() {
@@ -216,7 +224,7 @@ func decode_message(message string) (string, error) {
 		return em, nil
 	}
 	if strings.HasPrefix(message, "RGB") {
-		return "TODO: learn from: " + message, nil
+		SOURCE_MAP.learn_input_from(message[3:])
 	}
 	f, e := decode_tone(message)
 	if e == nil {
