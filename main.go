@@ -8,19 +8,28 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 var DEBUG = false
+
+var mu sync.Mutex
+
+func report(format string, args ...interface{}) (int, error) {
+	mu.Lock()
+	defer mu.Unlock()
+	return fmt.Printf(format, args...)
+}
 
 func main() {
 	// args := flag.Args() // doesn't work
 	args := os.Args
 	if false && len(args) > 0 {
-		fmt.Printf("Found args %v\n", args)
+		report("Found args %v\n", args)
 	}
 	address := "192.168.86.32:23"
 	conn, _ := net.Dial("tcp", address)
-	fmt.Printf("Connected to %s\n", address)
+	report("Connected to %s\n", address)
 
 	defer conn.Close()
 	go read(conn)
@@ -43,7 +52,7 @@ func main() {
 		// note: if string is empty, split_command returns [empty]
 		split_command := strings.Split(command, " ")
 		if DEBUG {
-			fmt.Printf("%s %d\n", split_command, len(split_command))
+			report("%s %d\n", split_command, len(split_command))
 		}
 		if len(split_command) == 0 {
 			continue
@@ -65,7 +74,7 @@ func main() {
 			exit()
 		case command == "debug":
 			DEBUG = !DEBUG
-			fmt.Printf("Debug is now %v\n", DEBUG)
+			report("Debug is now %v\n", DEBUG)
 		case command == "status":
 			get_status(ch)
 		case command == "learn":
@@ -84,7 +93,7 @@ func main() {
 		// skipping "select" and "display" for now
 		case err == nil:
 			if i > 0 {
-				fmt.Printf("Volume up %d\n", i)
+				report("Volume up %d\n", i)
 				i = min(i, 10)
 				for x := 0; x < i; x++ {
 					ch <- "VU"
@@ -92,7 +101,7 @@ func main() {
 			}
 			if i < 0 {
 				i = Abs(max(i, -30))
-				fmt.Printf("Volume down %d\n", i)
+				report("Volume down %d\n", i)
 				for x := 0; x < i; x++ {
 					ch <- "VD"
 				}
@@ -100,14 +109,14 @@ func main() {
 
 		case comm != "":
 			if DEBUG {
-				fmt.Printf("Mapped to %s\n", comm)
+				report("Mapped to %s\n", comm)
 			}
 			text = comm
 			ch <- text
 		case base_command == "mode":
 			change_mode(ch, split_command)
 		default:
-			fmt.Printf("Unknown command, sending raw: %s\n", command)
+			report("Unknown command, sending raw: %s\n", command)
 			text = command
 			ch <- text
 		}
@@ -127,7 +136,7 @@ func change_mode(ch chan string, split_command []string) bool {
 	if len(mset) == 1 {
 		mode := mset[0]
 		m := inverseModeSetMap[mode]
-		fmt.Printf("Trying to change mode to %s (%s)\n", modestring, m)
+		report("Trying to change mode to %s (%s)\n", modestring, m)
 		ch <- m + "SR"
 		return true
 	}
@@ -159,14 +168,14 @@ func get_modes_with_prefix(prefix string) []string {
 func print_input_source_help() {
 	fmt.Println("Enter one of the following to change input:")
 	for i, inv := range SOURCE_MAP.inverse_map { // TODO: sort
-		fmt.Printf("%s (%s)\n", i, inv)
+		report("%s (%s)\n", i, inv)
 	}
-	fmt.Println("Use 'learn' to update this map, 'save' to save it.")
+	report("Use 'learn' to update this map, 'save' to save it.")
 
 }
 
 func exit() {
-	fmt.Println("Adios!")
+	report("Adios!")
 	os.Exit(0)
 }
 
@@ -203,7 +212,7 @@ func read(conn net.Conn) {
 	for {
 		message, e := reader.ReadString('\n')
 		if e != nil {
-			fmt.Println("Read error", e)
+			report("Read error: %v", e)
 		}
 		// fmt.Println("Read from conn: ", message)
 		message = strings.TrimSpace(message)
@@ -212,11 +221,11 @@ func read(conn net.Conn) {
 		}
 		f, e := decode_message(message)
 		if e == nil && len(f) > 0 {
-			fmt.Println(f)
+			report("%s\n", f)
 		} else {
 			if e != nil {
-				fmt.Printf("Could not decode %v\n", e)
-				fmt.Printf("Message from server, len %d: %s ", len(message), message)
+				report("Could not decode %v\n", e)
+				report("Message from server, len %d: %s ", len(message), message)
 			}
 		}
 	}
