@@ -42,7 +42,9 @@ func main() {
 		}
 		// note: if string is empty, split_command returns [empty]
 		split_command := strings.Split(command, " ")
-		fmt.Printf("%s %d\n", split_command, len(split_command))
+		if DEBUG {
+			fmt.Printf("%s %d\n", split_command, len(split_command))
+		}
 		if len(split_command) == 0 {
 			continue
 		}
@@ -63,7 +65,7 @@ func main() {
 			exit()
 		case command == "debug":
 			DEBUG = !DEBUG
-			fmt.Printf("Debug is now %v", DEBUG)
+			fmt.Printf("Debug is now %v\n", DEBUG)
 		case command == "status":
 			get_status(ch)
 		case command == "learn":
@@ -71,6 +73,8 @@ func main() {
 				s := fmt.Sprintf("?RGB%2d", i)
 				ch <- s
 			}
+		case command == "save":
+			SOURCE_MAP.save_to_file()
 		case command == "sources" || command == "inputs":
 			print_input_source_help()
 		case command == "help":
@@ -259,9 +263,9 @@ func decode_message(message string) (string, error) {
 	}
 
 	if strings.HasPrefix(message, "FN") {
-		// println("Got input %s", message)
-		inputstring := defaultInputSourcesMap[message[2:]]
-		return inputstring, nil
+		// fmt.Printf("Got input %s\n", message)
+		inputstring := SOURCE_MAP.source_map[message[2:]]
+		return fmt.Sprintf("Input is %s", inputstring), nil
 	}
 	if strings.HasPrefix(message, "VTC") {
 		return decode_vtc(message)

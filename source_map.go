@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 )
 
@@ -62,6 +64,7 @@ func init() {
 	SOURCE_MAP.inverse_map = map[string]string{}
 	SOURCE_MAP.alias_map = map[string]string{}
 	SOURCE_MAP.init_from_map(defaultInputSourcesMap)
+	SOURCE_MAP.read_from_file()
 	SOURCE_MAP.add_aliases()
 }
 
@@ -73,7 +76,36 @@ func (m *SourceMap) init_from_map(initmap map[string]string) {
 	}
 }
 
-func (m SourceMap) register_reverse_source(k string, v string) {
+func (m *SourceMap) read_from_file() {
+	data, err := os.ReadFile(sources_map_filename)
+	if err != nil {
+		fmt.Printf("Couldnt read json file %s\n", sources_map_filename)
+		return
+	}
+	// var mystruct []interface{}
+	var mystruct map[string]string
+	err = json.Unmarshal(data, &mystruct)
+	if err != nil {
+		fmt.Printf("Error parsing json: %v\n", err)
+		return
+	}
+	m.init_from_map(mystruct)
+}
+
+func (m *SourceMap) save_to_file() {
+	filename := "json_map.json"
+	data, err := json.Marshal(m.source_map)
+	if err != nil {
+		fmt.Printf("Error building json data: %v\n", err)
+	} else {
+		err = os.WriteFile(filename, data, 0666)
+		if err != nil {
+			fmt.Printf("Error writing json file: %s\n", err)
+		}
+	}
+}
+
+func (m *SourceMap) register_reverse_source(k string, v string) {
 	newk := strings.ToLower(v)
 	m.inverse_map[newk] = strings.Join([]string{k, "FN"}, "")
 }
@@ -88,14 +120,14 @@ func (m *SourceMap) update_source(name string, id string) {
 	}
 }
 
-func (m SourceMap) add_alias(a string, b string) {
+func (m *SourceMap) add_alias(a string, b string) {
 	a = strings.ToLower(a)
 	b = strings.ToLower(b)
 	m.alias_map[a] = b
 	m.alias_map[b] = a
 	m.check_aliases(a, b)
 }
-func (m SourceMap) check_aliases(a string, b string) {
+func (m *SourceMap) check_aliases(a string, b string) {
 	_, has_a := m.inverse_map[a]
 	_, has_b := m.inverse_map[b]
 	if !has_a && has_b {
@@ -107,7 +139,7 @@ func (m SourceMap) check_aliases(a string, b string) {
 	}
 }
 
-func (m SourceMap) add_aliases() {
+func (m *SourceMap) add_aliases() {
 	m.add_alias("apple", "appletv")
 	m.add_alias("amazon", "amazontv")
 	m.add_alias("radio", "tuner")
