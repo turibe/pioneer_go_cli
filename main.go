@@ -91,8 +91,24 @@ func main() {
 			print_input_source_help()
 		case command == "modes":
 			print_mode_help()
-		case command == "help" || command == "?":
-			print_help()
+		case base_command == "help" || base_command == "?":
+			if command == base_command {
+				print_help()
+			}
+			if len(split_command) == 2 {
+				topic := split_command[1]
+				if strings.HasPrefix("modes", topic) {
+					print_mode_help()
+					continue
+				}
+				if strings.HasPrefix("sources", topic) {
+					print_input_source_help()
+					continue
+				}
+				report("Couldn't recognize help command %s\n", command)
+				continue
+			}
+
 		// skipping "select" and "display" for now
 		case err == nil:
 			if i > 0 {
@@ -161,6 +177,8 @@ func print_mode_help() {
 	}
 }
 
+// Returns keys that start with "prefix" --- with the special case
+// where if "string" is a key, only {string} is returned.
 func get_modes_with_prefix(prefix string) []string {
 	r := []string{}
 	_, ok := inverseModeSetMap[prefix]
@@ -225,7 +243,9 @@ func read(conn net.Conn) {
 		if e != nil {
 			report("Read error: %v", e)
 		}
-		// fmt.Println("Read from conn: ", message)
+		if DEBUG {
+			report("Read from conn: %s", message)
+		}
 		message = strings.TrimSpace(message)
 		if len(message) == 0 {
 			continue
@@ -340,9 +360,7 @@ func decode_message(message string) (string, error) {
 		return f, e
 	}
 	if strings.HasPrefix(message, "AST") {
-		// TODO: clean up
-		decode_ast(message)
-		return "", nil
+		return decode_ast(message)
 	}
 	if strings.HasPrefix(message, "VTC") {
 		return decode_vtc(message)

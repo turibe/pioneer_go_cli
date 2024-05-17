@@ -135,39 +135,39 @@ func (m MyMap[K, V]) get(k K, deflt V) V {
 
 // Decodes an AST return status string
 // Called for print side effect
-func decode_ast(st string) bool {
-
+func decode_ast(st string) (string, error) {
+	var r = ""
 	// assert s.startswith("AST")
 	s := []byte(st[3:])
-	println("Audio input signal: " + decode_ais(s[0:2]))
-	println("Audio input frequency: " + decode_aif(s[2:4]))
+	r += fmt.Sprintf("Audio input signal: %s\n", decode_ais(s[0:2]))
+	r += fmt.Sprintf("Audio input frequency: %s\n", decode_aif(s[2:4]))
+
 	// The manual starts counting at 1, so to fix this off-by-one, we do:
 	s = append([]byte("-"), s...)
 
 	// channels...
-	println("Input Channels:")
+	r += "Input Channels:\n"
 
 	for i, v := range CHANNEL_MAP {
 		if i >= len(s) {
 			continue
 		}
 		if s[i] == '1' {
-			fmt.Printf("%s,\n", v)
+			r += fmt.Sprintf("%s,\n", v)
 		}
 	}
-	println("")
-	println("Output Channels:")
+	r += "\n"
+	r += "Output Channels:\n"
 	for i, v := range CHANNEL_MAP {
 		idx := i + 21
 		if idx >= len(s) {
 			continue
 		}
 		if s[idx] == '1' {
-			fmt.Printf("%s,\n", v)
+			r += fmt.Sprintf("%s,\n", v)
 		}
 	}
-	// println("")
-	return true
+	return r, nil
 }
 
 var aif_map = MyMap[string, string]{
