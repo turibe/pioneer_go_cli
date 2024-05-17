@@ -11,7 +11,8 @@ func translate_mode(s string) (string, error) {
 		return "", fmt.Errorf("not valid mode %s", s)
 	}
 	s = s[2:]
-	return modeDisplayMap.get(s, "Unknown"), nil
+	mode := modeDisplayMap.get(s, "Unknown")
+	return fmt.Sprintf("Mode is %s", mode), nil
 }
 
 // LISTENING MODE information

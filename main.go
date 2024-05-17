@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -13,11 +14,11 @@ import (
 
 var DEBUG = false
 
-var mu sync.Mutex
+var print_mutex sync.Mutex
 
 func report(format string, args ...interface{}) (int, error) {
-	mu.Lock()
-	defer mu.Unlock()
+	print_mutex.Lock()
+	defer print_mutex.Unlock()
 	return fmt.Printf(format, args...)
 }
 
@@ -140,6 +141,8 @@ func change_mode(ch chan string, split_command []string) bool {
 		ch <- m + "SR"
 		return true
 	}
+	print_mutex.Lock()
+	defer print_mutex.Unlock()
 	fmt.Println("Which mode do you mean? Options are:")
 	for i := 0; i < len(mset); i++ {
 		println(mset[i])
@@ -149,6 +152,8 @@ func change_mode(ch chan string, split_command []string) bool {
 
 // Lists the mode change options (not all work)
 func print_mode_help() {
+	print_mutex.Lock()
+	defer print_mutex.Unlock()
 	fmt.Println("mode [mode]\tfor one of:")
 	for i := range inverseModeSetMap {
 		println(i)
@@ -166,11 +171,13 @@ func get_modes_with_prefix(prefix string) []string {
 }
 
 func print_input_source_help() {
+	print_mutex.Lock()
+	defer print_mutex.Unlock()
 	fmt.Println("Enter one of the following to change input:")
-	for i, inv := range SOURCE_MAP.inverse_map { // TODO: sort
-		report("%s (%s)\n", i, inv)
+	for _, k := range SortedKeys(SOURCE_MAP.inverse_map) {
+		fmt.Printf("%s (%s)\n", k, SOURCE_MAP.inverse_map[k])
 	}
-	report("Use 'learn' to update this map, 'save' to save it to a JSON file.\n")
+	fmt.Print("Use 'learn' to update this map, 'save' to save it to a JSON file.\n")
 }
 
 func exit() {
@@ -233,6 +240,9 @@ func read(conn net.Conn) {
 // handles the message that comes back from the AVR
 func decode_message(message string) (string, error) {
 
+	if DEBUG {
+		report("Decoding %s\n", message)
+	}
 	// TODO: this function often checks things twice, builds unecessary errors.
 	// Ideally would simplify to a switch.
 	em := ErrorMap[message]
@@ -329,4 +339,15 @@ func Abs[T ~int | ~int32 | ~int64](x T) T {
 		return -x
 	}
 	return x
+}
+
+func SortedKeys[T interface{}](m map[string]T) (result []string) {
+	result = make([]string, len(m))
+	count := 0
+	for k := range m {
+		result[count] = k
+		count += 1
+	}
+	sort.Strings(result)
+	return result
 }
