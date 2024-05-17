@@ -308,6 +308,33 @@ func decode_message(message string) (string, error) {
 		inputstring := SOURCE_MAP.source_map[message[2:]]
 		return fmt.Sprintf("Input is %s", inputstring), nil
 	}
+	if strings.HasPrefix(message, "ATW") {
+		f, e = SwitchChar(message, 3)
+		return fmt.Sprintf("loudness is %s", f), e
+	}
+	if strings.HasPrefix(message, "ATC") {
+		f, e = SwitchChar(message, 3)
+		return fmt.Sprintf("eq is %s", f), e
+	}
+	if strings.HasPrefix(message, "ATD") {
+		f, e = SwitchChar(message, 3)
+		return fmt.Sprintf("standing wave is %s", f), e
+	}
+	if strings.HasPrefix(message, "ATE") {
+		num := message[3:]
+		switch {
+		case "00" <= num && num <= "16":
+			return fmt.Sprintf("Phase control: %s ms", num), nil
+		case num == "97":
+			return "Phase control: AUTO", nil
+		case num == "98":
+			return "Phase control: UP", nil
+		case num == "99":
+			return "Phase control: DOWN", nil
+		default:
+			return "Phase control: unknown", nil
+		}
+	}
 	f, e = translate_mode(message)
 	if e == nil {
 		return f, e
@@ -370,4 +397,18 @@ func SortedKeys[K cmp.Ordered, T any](m map[K]T) (result []K) {
 	result = Keys(m)
 	slices.Sort(result)
 	return result
+}
+
+func SwitchChar(s string, i int) (string, error) {
+	if i >= len(s) {
+		return "", fmt.Errorf("switch error, string too short: %s, %d", s, i)
+	}
+	switch s[i] {
+	case '1':
+		return "on", nil
+	case '0':
+		return "off", nil
+	default:
+		return "", fmt.Errorf("unexpected switch: %s, %d", s, i)
+	}
 }
