@@ -2,11 +2,12 @@ package main
 
 import (
 	"bufio"
+	"cmp"
 	"fmt"
 	"io"
 	"net"
 	"os"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -46,7 +47,8 @@ func main() {
 		if e == io.EOF {
 			exit()
 		}
-		command := strings.ToLower(strings.TrimSpace(text))
+		text = strings.TrimSpace(text)
+		command := strings.ToLower(text)
 		if command == "" {
 			continue
 		}
@@ -117,8 +119,7 @@ func main() {
 		case base_command == "mode":
 			change_mode(ch, split_command)
 		default:
-			report("Unknown command, sending raw: %s\n", command)
-			text = command
+			report("Unknown command, sending raw: %s\n", text)
 			ch <- text
 		}
 	}
@@ -155,13 +156,17 @@ func print_mode_help() {
 	print_mutex.Lock()
 	defer print_mutex.Unlock()
 	fmt.Println("mode [mode]\tfor one of:")
-	for i := range inverseModeSetMap {
-		println(i)
+	for _, k := range SortedKeys(inverseModeSetMap) {
+		println(k)
 	}
 }
 
 func get_modes_with_prefix(prefix string) []string {
 	r := []string{}
+	_, ok := inverseModeSetMap[prefix]
+	if ok {
+		return []string{prefix}
+	}
 	for k := range inverseModeSetMap {
 		if strings.HasPrefix(k, prefix) {
 			r = append(r, k)
@@ -303,9 +308,6 @@ func decode_message(message string) (string, error) {
 		inputstring := SOURCE_MAP.source_map[message[2:]]
 		return fmt.Sprintf("Input is %s", inputstring), nil
 	}
-	if strings.HasPrefix(message, "VTC") {
-		return decode_vtc(message)
-	}
 	f, e = translate_mode(message)
 	if e == nil {
 		return f, e
@@ -314,6 +316,16 @@ func decode_message(message string) (string, error) {
 		// TODO: clean up
 		decode_ast(message)
 		return "", nil
+	}
+	if strings.HasPrefix(message, "VTC") {
+		return decode_vtc(message)
+	}
+	if strings.HasPrefix(message, "SR") {
+		code := message[2:]
+		v, ok := modeSetMap[code]
+		if ok {
+			return fmt.Sprintf("mode is %s (%s)", v, message), nil
+		}
 	}
 	f, e = decode_vst(message)
 	if e == nil {
@@ -326,7 +338,11 @@ func decode_message(message string) (string, error) {
 }
 
 func print_help() {
-	for c := range commandMap {
+	commands := []string{"help", "status", "quit", "learn", "debug", "save"}
+	k := Keys(commandMap)
+	commands = slices.Concat(commands, k)
+	slices.Sort(commands)
+	for _, c := range commands {
 		println(c)
 	}
 	print("Use \"help mode\" for information on modes, \"help sources\" for changing input sources, \"quit\" to exit\n")
@@ -341,13 +357,17 @@ func Abs[T ~int | ~int32 | ~int64](x T) T {
 	return x
 }
 
-func SortedKeys[T interface{}](m map[string]T) (result []string) {
-	result = make([]string, len(m))
+func Keys[K comparable, T any](m map[K]T) (result []K) {
+	result = make([]K, len(m))
 	count := 0
 	for k := range m {
 		result[count] = k
 		count += 1
 	}
-	sort.Strings(result)
+	return result
+}
+func SortedKeys[K cmp.Ordered, T any](m map[K]T) (result []K) {
+	result = Keys(m)
+	slices.Sort(result)
 	return result
 }

@@ -6,6 +6,7 @@ import (
 )
 
 // TODO: instead of error, just a bool?
+// Translate LM prefixes
 func translate_mode(s string) (string, error) {
 	if !(strings.HasPrefix(s, "LM")) {
 		return "", fmt.Errorf("not valid mode %s", s)
