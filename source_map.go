@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"strings"
 )
@@ -79,29 +78,29 @@ func (m *SourceMap) init_from_map(initmap map[string]string) {
 func (m *SourceMap) read_from_file() {
 	data, err := os.ReadFile(sources_map_filename)
 	if err != nil {
-		fmt.Printf("Could not read json file %s\n", sources_map_filename)
+		report("Could not read json file %s\n", sources_map_filename)
 		return
 	}
 	// var mystruct []interface{}
 	var mystruct map[string]string
 	err = json.Unmarshal(data, &mystruct)
 	if err != nil {
-		fmt.Printf("Error parsing json: %v\n", err)
+		report("Error parsing json: %v\n", err)
 		return
 	}
 	m.init_from_map(mystruct)
-	fmt.Printf("Updated sources map from %s\n", sources_map_filename)
+	report("Updated sources map from %s\n", sources_map_filename)
 }
 
 func (m *SourceMap) save_to_file() {
 	filename := "json_map.json"
 	data, err := json.Marshal(m.source_map)
 	if err != nil {
-		fmt.Printf("Error building json data: %v\n", err)
+		report("Error building json data: %v\n", err)
 	} else {
 		err = os.WriteFile(filename, data, 0666)
 		if err != nil {
-			fmt.Printf("Error writing json file: %s\n", err)
+			report("Error writing json file: %s\n", err)
 		}
 	}
 }
@@ -112,7 +111,7 @@ func (m *SourceMap) register_reverse_source(k string, v string) {
 }
 
 func (m *SourceMap) update_source(name string, id string) {
-	fmt.Printf("Updating source %s (%s)\n", name, id)
+	report("Updating source %s (%s)\n", name, id)
 	m.source_map[id] = name
 	m.register_reverse_source(id, name)
 	alias, ok := m.alias_map[name]
@@ -151,7 +150,7 @@ func (m *SourceMap) learn_input_from(s string) {
 	id := s[0:2]
 	name := s[3:]
 	if m.source_map[id] != name {
-		fmt.Printf("Updating source name %s for %s\n", name, id)
+		report("Updating source name %s for %s\n", name, id)
 		m.update_source(name, id)
 	}
 }

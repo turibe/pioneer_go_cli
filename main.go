@@ -88,7 +88,7 @@ func main() {
 			print_input_source_help()
 		case command == "modes":
 			print_mode_help()
-		case command == "help":
+		case command == "help" || command == "?":
 			print_help()
 		// skipping "select" and "display" for now
 		case err == nil:
@@ -170,12 +170,11 @@ func print_input_source_help() {
 	for i, inv := range SOURCE_MAP.inverse_map { // TODO: sort
 		report("%s (%s)\n", i, inv)
 	}
-	report("Use 'learn' to update this map, 'save' to save it.")
-
+	report("Use 'learn' to update this map, 'save' to save it to a JSON file.\n")
 }
 
 func exit() {
-	report("Adios!")
+	report("Adios!\n")
 	os.Exit(0)
 }
 
@@ -278,6 +277,15 @@ func decode_message(message string) (string, error) {
 		return "Power is ON", nil
 	case "PWR1":
 		return "Power is OFF", nil
+	}
+
+	if strings.HasPrefix(message, "SVB") {
+		report("AVR mac address: %s\n", message[3:])
+		return "", nil
+	}
+	if strings.HasPrefix(message, "SSI") {
+		report("AVR software version: %s\n", message[3:])
+		return "", nil
 	}
 
 	if strings.HasPrefix(message, "FN") {
