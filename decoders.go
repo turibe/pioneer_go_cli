@@ -133,8 +133,7 @@ func (m MyMap[K, V]) get(k K, deflt V) V {
 	return v
 }
 
-// Decodes an AST return status string
-// Called for print side effect
+// Decodes an AST return status string.
 func decode_ast(st string) (string, error) {
 	var r = ""
 	// assert s.startswith("AST")

@@ -3,6 +3,8 @@ package main
 import (
 	"bufio"
 	"cmp"
+	"embed"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -11,11 +13,16 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	_ "net/http/pprof"
 )
 
 var DEBUG = false
 
 var print_mutex sync.Mutex
+
+//go:embed commandMap.json
+var MainFolder embed.FS
 
 func report(format string, args ...interface{}) (int, error) {
 	print_mutex.Lock()
@@ -23,7 +30,39 @@ func report(format string, args ...interface{}) (int, error) {
 	return fmt.Printf(format, args...)
 }
 
+func readCommandMap() map[string]([]string) {
+	var err error
+	var data []byte
+	filename := "commandMap.json"
+	data, err = MainFolder.ReadFile(filename)
+	if err != nil {
+		report("Could not read command map from %s: %s\n", filename, err)
+		os.Exit(1)
+	}
+	var cmap map[string]([]string)
+	err = json.Unmarshal(data, &cmap)
+	if err != nil {
+		report("Error parsing json command map from %s: %v\n", filename, err)
+		os.Exit(1)
+	}
+	report("Read command map from %s\n", filename)
+	return cmap
+}
+
+var commandMap map[string]([]string)
+
+func init() {
+	commandMap = readCommandMap()
+}
+
 func main() {
+
+	/***
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
+	***/
+
 	// args := flag.Args() // doesn't work
 	args := os.Args
 	if false && len(args) > 0 {
@@ -68,9 +107,12 @@ func main() {
 			}
 		*/
 		i, err := strconv.Atoi(command)
-		comm, ok := commandMap[command]
+		pair, ok := commandMap[command]
+		var comm string
 		if !ok {
 			comm = SOURCE_MAP.inverse_map[command]
+		} else {
+			comm = pair[0]
 		}
 		switch {
 		case command == "quit" || command == "exit":
@@ -105,6 +147,10 @@ func main() {
 					print_input_source_help()
 					continue
 				}
+				pair, ok := commandMap[command]
+				if ok && len(pair) == 2 {
+					report("%s: %s", pair[0], pair[0])
+				}
 				report("Couldn't recognize help command %s\n", command)
 				continue
 			}
@@ -130,8 +176,9 @@ func main() {
 			if DEBUG {
 				report("Mapped to %s\n", comm)
 			}
-			text = comm
-			ch <- text
+			for _, text := range strings.Split(comm, ",") {
+				ch <- text
+			}
 		case base_command == "mode":
 			change_mode(ch, split_command)
 		default:
@@ -375,6 +422,9 @@ func decode_message(message string) (string, error) {
 	f, e = decode_vst(message)
 	if e == nil {
 		return f, e
+	}
+	if strings.HasPrefix(message, "RGD") {
+		return fmt.Sprintf("AVR model info: %s", message), nil
 	}
 	if strings.HasPrefix(message, "VOL") {
 		return "", nil

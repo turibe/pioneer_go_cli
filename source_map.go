@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -76,31 +77,45 @@ func (m *SourceMap) init_from_map(initmap map[string]string) {
 }
 
 func (m *SourceMap) read_from_file() {
-	data, err := os.ReadFile(sources_map_filename)
+	// TODO: prefer user's home directory first
+	dirname, err := os.UserHomeDir()
 	if err != nil {
-		report("Could not read json file %s\n", sources_map_filename)
+		report("Could not get home directory when looking for custom sources %v", err)
+		return
+	}
+	filename := filepath.Join(dirname, sources_map_filename)
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		report("Could not read json file %s: %v\n", filename, err)
 		return
 	}
 	// var mystruct []interface{}
 	var mystruct map[string]string
 	err = json.Unmarshal(data, &mystruct)
 	if err != nil {
-		report("Error parsing json: %v\n", err)
+		report("Error parsing json sourcemap from %s: %v\n", filename, err)
 		return
 	}
 	m.init_from_map(mystruct)
-	report("Updated sources map from %s\n", sources_map_filename)
+	report("Updated sources map from %s\n", filename)
 }
 
 func (m *SourceMap) save_to_file() {
-	filename := "json_map.json"
+	dirname, err := os.UserHomeDir()
+	if err != nil {
+		report("Couldn't get home directory for saving custom source map: %v", err)
+		return
+	}
+	filename := filepath.Join(dirname, sources_map_filename)
 	data, err := json.Marshal(m.source_map)
 	if err != nil {
 		report("Error building json data: %v\n", err)
 	} else {
 		err = os.WriteFile(filename, data, 0666)
 		if err != nil {
-			report("Error writing json file: %s\n", err)
+			report("Error writing json file to %s: %s\n", filename, err)
+		} else {
+			report("Wrote sources map to %s\n", filename)
 		}
 	}
 }

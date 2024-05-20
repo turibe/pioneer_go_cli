@@ -23,8 +23,8 @@ func TestDecodeFL2(t *testing.T) {
 func TestDecodeMessage(t *testing.T) {
 	f, e := decode_message("LM010f")
 	assert.Equal(t, nil, e)
-	assert.Equal(t, "WIDE SURR MUSIC", f)
+	assert.Equal(t, "Mode is WIDE SURR MUSIC", f)
 
-	f, e = decode_message("foobar")
+	_, e = decode_message("foobar")
 	assert.NotNil(t, e)
 }
