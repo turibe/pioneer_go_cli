@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -57,19 +58,38 @@ func init() {
 
 func main() {
 
-	/***
+	/*** for benchmarking:
 	go func() {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
 	***/
 
-	// args := flag.Args() // doesn't work
 	args := os.Args
-	if false && len(args) > 0 {
-		report("Found args %v\n", args)
+	var address string
+	if len(args) > 1 {
+		// report("Found args %v\n", args)
+		address = args[1]
+	} else {
+		address = "192.168.86.32:23"
 	}
-	address := "192.168.86.32:23"
-	conn, _ := net.Dial("tcp", address)
+	regex, ec := regexp.Compile("(.*):([0-9]+)")
+	if ec != nil {
+		report("error compiling regex: %s\n", ec)
+		os.Exit(1)
+	}
+	matches := regex.FindAllStringSubmatch(address, -1)
+	default_port := "23"
+	if len(matches) == 0 {
+		report("Using default port %s\n", default_port)
+		address = strings.Join([]string{address, default_port}, ":")
+	} else {
+		// report("Found port %s\n", matches)
+	}
+	conn, err := net.Dial("tcp", address)
+	if err != nil {
+		report("Error connecting to %s: %v\n", address, err)
+		os.Exit(1)
+	}
 	report("Connected to %s\n", address)
 
 	defer conn.Close()
