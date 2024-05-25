@@ -14,8 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-
-	_ "net/http/pprof"
+	// _ "net/http/pprof"
 )
 
 var DEBUG = false
@@ -141,7 +140,7 @@ func main() {
 			DEBUG = !DEBUG
 			report("Debug is now %v\n", DEBUG)
 		case command == "status":
-			get_status(ch)
+			getStatus(ch)
 		case command == "learn":
 			for i := 0; i < 60; i++ {
 				s := fmt.Sprintf("?RGB%2d", i)
@@ -150,31 +149,35 @@ func main() {
 		case command == "save":
 			SOURCE_MAP.save_to_file()
 		case command == "sources" || command == "inputs":
-			print_input_source_help()
+			printInputSourceHelp()
 		case command == "modes":
-			print_mode_help()
+			printModeHelp()
 		case base_command == "help" || base_command == "?":
 			if command == base_command {
 				print_help()
+				continue
 			}
 			if len(split_command) == 2 {
 				topic := split_command[1]
 				if strings.HasPrefix("modes", topic) {
-					print_mode_help()
+					printModeHelp()
 					continue
 				}
 				if strings.HasPrefix("sources", topic) {
-					print_input_source_help()
+					printInputSourceHelp()
 					continue
 				}
-				pair, ok := commandMap[command]
+				pair, ok := commandMap[topic]
 				if ok && len(pair) == 2 {
-					report("%s: %s", pair[0], pair[0])
+					report("%s: %s\n", topic, pair[1])
+					continue
+				} else {
+					report("Unknown command: %s\n", topic)
+					continue
 				}
-				report("Couldn't recognize help command %s\n", command)
-				continue
 			}
-
+			report("Couldn't recognize help command %s\n", command)
+			continue
 		// skipping "select" and "display" for now
 		case err == nil:
 			if i > 0 {
@@ -200,7 +203,7 @@ func main() {
 				ch <- text
 			}
 		case base_command == "mode":
-			change_mode(ch, split_command)
+			changeMode(ch, split_command)
 		default:
 			report("Unknown command, sending raw: %s\n", text)
 			ch <- text
@@ -208,13 +211,13 @@ func main() {
 	}
 }
 
-func change_mode(ch chan string, split_command []string) bool {
+func changeMode(ch chan string, split_command []string) bool {
 	if len(split_command) < 2 {
 		return false
 	}
 	modestring := strings.Join(split_command[1:], " ")
 	if modestring == "help" {
-		print_mode_help()
+		printModeHelp()
 		return true
 	}
 	mset := get_modes_with_prefix(modestring)
@@ -235,7 +238,7 @@ func change_mode(ch chan string, split_command []string) bool {
 }
 
 // Lists the mode change options (not all work)
-func print_mode_help() {
+func printModeHelp() {
 	print_mutex.Lock()
 	defer print_mutex.Unlock()
 	fmt.Println("mode [mode]\tfor one of:")
@@ -260,7 +263,8 @@ func get_modes_with_prefix(prefix string) []string {
 	return r
 }
 
-func print_input_source_help() {
+// prints help for input source change options
+func printInputSourceHelp() {
 	print_mutex.Lock()
 	defer print_mutex.Unlock()
 	fmt.Println("Enter one of the following to change input:")
@@ -284,7 +288,7 @@ func sender(conn net.Conn, c <-chan string) {
 }
 
 // sends query commands to get various system status info back
-func get_status(c chan<- string) {
+func getStatus(c chan<- string) {
 	vals := []string{
 		"?P",
 		"?F",
@@ -331,7 +335,6 @@ func read(conn net.Conn) {
 
 // handles the message that comes back from the AVR
 func decode_message(message string) (string, error) {
-
 	if DEBUG {
 		report("Decoding %s\n", message)
 	}
@@ -392,8 +395,8 @@ func decode_message(message string) (string, error) {
 
 	if strings.HasPrefix(message, "FN") {
 		// fmt.Printf("Got input %s\n", message)
-		inputstring := SOURCE_MAP.source_map[message[2:]]
-		return fmt.Sprintf("Input is %s", inputstring), nil
+		inputString := SOURCE_MAP.source_map[message[2:]]
+		return fmt.Sprintf("Input is %s", inputString), nil
 	}
 	if strings.HasPrefix(message, "ATW") {
 		f, e = SwitchChar(message, 3)
@@ -447,7 +450,8 @@ func decode_message(message string) (string, error) {
 		return fmt.Sprintf("AVR model info: %s", message), nil
 	}
 	if strings.HasPrefix(message, "VOL") {
-		return "", nil
+		vol := volDbLevel(message[3:])
+		return fmt.Sprintf("volume is %s", vol), nil
 	}
 	return message, fmt.Errorf("unknown message %s", message)
 }

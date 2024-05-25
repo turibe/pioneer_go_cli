@@ -230,8 +230,8 @@ func decode_ais(st []byte) string {
 	}
 }
 
-// db level conversion
-func db_level(s string) string {
+// db level conversion for treble, bass:
+func dbLevel(s string) string {
 	n, e := strconv.Atoi(s)
 	if e != nil {
 		return "?"
@@ -240,13 +240,22 @@ func db_level(s string) string {
 	return fmt.Sprintf("{%d}dB", db)
 }
 
+func volDbLevel(s string) string {
+	n, e := strconv.Atoi(s)
+	if e != nil {
+		return "?"
+	}
+	var db = float32(n-161) / 2.0
+	return fmt.Sprintf("%.2fdb", db)
+}
+
 // readable version of the tone status
 func decode_tone(s string) (string, error) {
 	if strings.HasPrefix(s, "TR") {
-		return "treble at " + db_level(s[2:4]), nil
+		return "treble at " + dbLevel(s[2:4]), nil
 	}
 	if strings.HasPrefix(s, "BA") {
-		return "bass at " + db_level(s[2:4]), nil
+		return "bass at " + dbLevel(s[2:4]), nil
 	}
 	if s == "TO0" {
 		return "tone off", nil
