@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 	// _ "net/http/pprof"
 )
 
@@ -200,7 +201,7 @@ func main() {
 				report("Mapped to %s\n", comm)
 			}
 			for _, text := range strings.Split(comm, ",") {
-				ch <- text
+				ch <- strings.TrimSpace(text)
 			}
 		case base_command == "mode":
 			changeMode(ch, split_command)
@@ -280,10 +281,17 @@ func exit() {
 }
 
 func sender(conn net.Conn, c <-chan string) {
+	var s string
+	last := time.Now()
 	for {
-		s := <-c
-		// fmt.Printf("Got message %s\n", s)
+		s = strings.TrimSpace(<-c)
+		if DEBUG {
+			fmt.Printf("Got message %s\n", s)
+		}
+		t := time.Since(last)
+		time.Sleep(max(10*time.Millisecond-t, 0))
 		fmt.Fprintf(conn, s+"\r\n")
+		last = time.Now()
 	}
 }
 
