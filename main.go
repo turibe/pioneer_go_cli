@@ -276,7 +276,7 @@ func printInputSourceHelp() {
 }
 
 func exit() {
-	report("Adios!\n")
+	report("Bye! Adiós!\n")
 	os.Exit(0)
 }
 

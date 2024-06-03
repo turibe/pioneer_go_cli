@@ -1,5 +1,5 @@
 # pioneer_go_cli
-Go version of Pioneer CLI telnet controller
+Golang version of Pioneer CLI telnet controller
 
 ==================
 
@@ -41,6 +41,7 @@ and the [Python 3 version](https://github.com/turibe/pioneer_python_cli).
 
 - Use control-D to exit.
 
-If you have customized your input names, `learn` gets them from the AVR, after which they are available as commands.
-`save` saves a json file that can be loaded in the future at startup.
+If you have customized the input names for your AVR (for example, "AppleTV", "My DVR", etc.),
+`learn` gets them from the AVR, after which they are available as commands.
+The `save` command saves a JSON file with these names, to be loaded in future sessions, at startup time.
 
